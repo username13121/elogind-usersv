@@ -1,11 +1,9 @@
 # elogind-usersv
 
 `elogind-usersv` is an elogind-specific launcher and lifecycle supervisor for
-per-user service managers. It starts one manager for each user with an eligible
-elogind login session and holds a separately verified elogind background
-session for the manager's complete lifetime.
-
-The central invariant is:
+per-user service managers. It starts one selected backend for each user with
+an eligible elogind login session and retains a separately verified elogind
+background session for the manager's complete lifetime.
 
 ```text
 managed manager alive
@@ -13,52 +11,61 @@ managed manager alive
     => elogind-owned XDG_RUNTIME_DIR retained
 ```
 
-The project is Linux-specific. The Rust workspace builds a root daemon, a
-single-threaded per-user supervisor, and a PAM session module. Service-manager
-backends are trusted executable files and follow
-[`docs/backend-protocol-v1.md`](docs/backend-protocol-v1.md).
+Backends are trusted root-installed executables following
+[`docs/backend-protocol-v1.md`](docs/backend-protocol-v1.md). The daemon has no
+default backend: the administrator must explicitly choose an installed backend
+by name.
 
-Implemented core behavior includes:
+The included backend is named **s6-user**. It integrates the independent
+[`s6-user`](https://github.com/username13121/s6-user) policy wrapper and does
+not claim to be an official s6 per-user implementation.
 
-- login1 reconciliation and eligible-class filtering;
-- a bounded, credential-checked PAM request protocol;
-- one explicit state machine and helper per UID;
-- verified internal `Class=background` PAM leases;
-- pidfd manager tracking, strict readiness framing, checked ready actions,
-  restart backoff, and graceful/TERM/KILL shutdown;
-- deterministic protocol test backends;
-- an s6 backend with shallow `s6-svscan` readiness.
+## Packages
 
-Build and test directly from this standalone repository with:
+- **elogind-usersv** — daemon, per-UID supervisor, PAM module, and safe
+  `/etc/pam.d/system-login` integration utility.
+- **elogind-usersv-backend-s6-user** — per-user s6-svscan/s6-rc backend using
+  the s6-user package.
+- **elogind-usersv-s6** — system s6-rc service definition. It does not select
+  or depend on a per-user backend.
 
-```sh
-make test
-make
-```
+## Install without compiling
 
-Build the Artix split packages independently of any other project with:
+Download the unsigned `.pkg.tar.zst` files and `SHA256SUMS` from the official
+GitHub Release page after installing the s6-user project packages:
 
 ```sh
-./build.sh --clean
+sha256sum -c SHA256SUMS
+sudo pacman -U ./*.pkg.tar.zst
 ```
 
-The script prints the exact `pacman -U` command for the packages it produced.
-It can also install the complete core, s6 backend, and s6 service set:
+## Build from source
+
+Install Cargo and the normal package build tools first. The script builds only;
+it never invokes pacman or resolves dependencies.
 
 ```sh
-./build.sh --install
+./build.sh --clean && sudo pacman -U ./packages/*.pkg.tar.zst
 ```
 
-See [`docs/deployment.md`](docs/deployment.md) before installing the PAM
-module, and [`docs/security.md`](docs/security.md) for the trust and lifetime
-model. Real elogind/PAM lifecycle validation is still required on the target
-distribution before production deployment.
+It writes package checksums to `packages/SHA256SUMS`.
 
-This is an independent repository with its own build and packaging process.
-It is not a general session manager, a login1 implementation, an owner of
-runtime directories, or an elogind-compatible API.
+## Required setup
+
+1. Set `backend = "s6-user"` in `/etc/elogind-usersv/config.toml`.
+2. Enable and start the system `elogind-usersvd` service.
+3. Confirm the daemon is running.
+4. Run `sudo elogind-usersv-pam enable`.
+5. Fully log out and log back in.
+
+See [`docs/deployment.md`](docs/deployment.md) before changing PAM,
+[`docs/security.md`](docs/security.md) for the trust model, and
+[`docs/releasing.md`](docs/releasing.md) for the unsigned release procedure.
+Run `make test-live` on the target Artix system before production use.
+
+This project is Linux-specific and is not a login1 implementation, general
+session manager, or owner of runtime directories.
 
 ## License
 
-`elogind-usersv` is distributed under the GNU General Public License version 3
-only (`GPL-3.0-only`). See [`LICENSE`](LICENSE).
+GPL-3.0-only. See [`LICENSE`](LICENSE).

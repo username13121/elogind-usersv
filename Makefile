@@ -5,7 +5,7 @@ PAMDIR ?= $(PREFIX)/lib/security
 SYSCONFDIR ?= /etc
 DESTDIR ?=
 
-.PHONY: all test install install-s6 clean
+.PHONY: all test test-live install install-s6 clean
 
 all:
 	cargo build --release --locked --workspace
@@ -13,7 +13,11 @@ all:
 test:
 	cargo test --locked --workspace
 	cargo clippy --locked --workspace --all-targets -- -D warnings
-	sh -n backends/s6 tests/backends/backend-test
+	cargo fmt --all -- --check
+	sh -n backends/s6-user tests/backends/backend-test elogind-usersv.install
+
+test-live:
+	cargo test --locked --workspace -- --ignored --test-threads=1
 
 install: all
 	install -Dm755 target/release/elogind-usersvd \
@@ -22,8 +26,10 @@ install: all
 		$(DESTDIR)$(LIBEXECDIR)/elogind-usersv-supervisor
 	install -Dm755 target/release/libpam_elogind_usersv.so \
 		$(DESTDIR)$(PAMDIR)/pam_elogind_usersv.so
-	install -Dm755 backends/s6 \
-		$(DESTDIR)$(LIBEXECDIR)/elogind-usersv/backends/s6
+	install -Dm755 target/release/elogind-usersv-pam \
+		$(DESTDIR)$(BINDIR)/elogind-usersv-pam
+	install -Dm755 backends/s6-user \
+		$(DESTDIR)$(LIBEXECDIR)/elogind-usersv/backends/s6-user
 	install -Dm644 config/config.toml \
 		$(DESTDIR)$(SYSCONFDIR)/elogind-usersv/config.toml
 	install -dm755 $(DESTDIR)$(SYSCONFDIR)/elogind-usersv/backends

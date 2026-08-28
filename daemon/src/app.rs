@@ -55,7 +55,7 @@ pub async fn run() -> Result<()> {
     }
     verify_root_owned_file(&arguments.supervisor_path, true)
         .context("supervisor executable is not trusted")?;
-    let config = Config::load_or_default(&arguments.config_path)?;
+    let config = Config::load(&arguments.config_path)?;
     initialize_logging(config.logging_verbosity);
     prepare_runtime_directory()?;
     let _daemon_lock = DaemonLock::acquire()?;

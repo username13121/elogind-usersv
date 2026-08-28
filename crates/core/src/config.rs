@@ -11,19 +11,28 @@ pub const DEFAULT_CONFIG_PATH: &str = "/etc/elogind-usersv/config.toml";
 pub const DEFAULT_CONTROL_SOCKET: &str = "/run/elogind-usersv/control.sock";
 pub const DEFAULT_RUNTIME_DIRECTORY: &str = "/run/elogind-usersv";
 pub const DEFAULT_SUPERVISOR_PATH: &str = "/usr/libexec/elogind-usersv-supervisor";
+pub const BACKEND_DIRECTORY: &str = "/usr/libexec/elogind-usersv/backends";
 pub const INTERNAL_PAM_SERVICE: &str = "elogind-usersv-manager";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-#[serde(default, deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
-    pub backend: PathBuf,
+    pub backend: String,
+    #[serde(default = "default_backend_config_dir")]
     pub backend_config_dir: PathBuf,
+    #[serde(default = "default_login_readiness_timeout_seconds")]
     pub login_readiness_timeout_seconds: u64,
+    #[serde(default = "default_graceful_stop_timeout_seconds")]
     pub graceful_stop_timeout_seconds: u64,
+    #[serde(default = "default_forced_stop_timeout_seconds")]
     pub forced_stop_timeout_seconds: u64,
+    #[serde(default = "default_restart_backoff_minimum_milliseconds")]
     pub restart_backoff_minimum_milliseconds: u64,
+    #[serde(default = "default_restart_backoff_maximum_seconds")]
     pub restart_backoff_maximum_seconds: u64,
+    #[serde(default)]
     pub root_eligible: bool,
+    #[serde(default)]
     pub logging_verbosity: LogLevel,
 }
 
@@ -53,23 +62,12 @@ impl Config {
         Ok(config)
     }
 
-    pub fn load_or_default(path: impl AsRef<Path>) -> Result<Self, ConfigError> {
-        let path = path.as_ref();
-        match Self::load(path) {
-            Ok(config) => Ok(config),
-            Err(ConfigError::Read { source, .. })
-                if source.kind() == std::io::ErrorKind::NotFound =>
-            {
-                let config = Self::default();
-                config.validate()?;
-                Ok(config)
-            }
-            Err(error) => Err(error),
-        }
-    }
-
     pub fn validate(&self) -> Result<(), ConfigError> {
-        require_absolute("backend", &self.backend)?;
+        if !valid_backend_name(&self.backend) {
+            return Err(ConfigError::Invalid(
+                "backend must match [a-z0-9][a-z0-9._-]*",
+            ));
+        }
         require_absolute("backend_config_dir", &self.backend_config_dir)?;
         if self.login_readiness_timeout_seconds == 0 {
             return Err(ConfigError::Invalid(
@@ -97,6 +95,10 @@ impl Config {
             ));
         }
         Ok(())
+    }
+
+    pub fn backend_path(&self) -> PathBuf {
+        Path::new(BACKEND_DIRECTORY).join(&self.backend)
     }
 
     pub fn login_readiness_timeout(&self) -> Duration {
@@ -127,20 +129,38 @@ impl Config {
     }
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            backend: "/usr/libexec/elogind-usersv/backends/s6".into(),
-            backend_config_dir: "/etc/elogind-usersv/backends".into(),
-            login_readiness_timeout_seconds: 30,
-            graceful_stop_timeout_seconds: 15,
-            forced_stop_timeout_seconds: 5,
-            restart_backoff_minimum_milliseconds: 500,
-            restart_backoff_maximum_seconds: 30,
-            root_eligible: false,
-            logging_verbosity: LogLevel::Info,
-        }
-    }
+fn default_backend_config_dir() -> PathBuf {
+    "/etc/elogind-usersv/backends".into()
+}
+
+fn default_login_readiness_timeout_seconds() -> u64 {
+    30
+}
+
+fn default_graceful_stop_timeout_seconds() -> u64 {
+    15
+}
+
+fn default_forced_stop_timeout_seconds() -> u64 {
+    5
+}
+
+fn default_restart_backoff_minimum_milliseconds() -> u64 {
+    500
+}
+
+fn default_restart_backoff_maximum_seconds() -> u64 {
+    30
+}
+
+fn valid_backend_name(name: &str) -> bool {
+    let mut bytes = name.bytes();
+    bytes
+        .next()
+        .is_some_and(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+        && bytes.all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'.' | b'_' | b'-')
+        })
 }
 
 #[derive(Debug, Error)]
@@ -178,38 +198,64 @@ fn require_absolute(field: &'static str, path: &Path) -> Result<(), ConfigError>
 mod tests {
     use super::*;
 
+    fn config() -> Config {
+        Config {
+            backend: "test-backend".into(),
+            backend_config_dir: default_backend_config_dir(),
+            login_readiness_timeout_seconds: default_login_readiness_timeout_seconds(),
+            graceful_stop_timeout_seconds: default_graceful_stop_timeout_seconds(),
+            forced_stop_timeout_seconds: default_forced_stop_timeout_seconds(),
+            restart_backoff_minimum_milliseconds: default_restart_backoff_minimum_milliseconds(),
+            restart_backoff_maximum_seconds: default_restart_backoff_maximum_seconds(),
+            root_eligible: false,
+            logging_verbosity: LogLevel::Info,
+        }
+    }
+
     #[test]
-    fn defaults_are_valid() {
-        Config::default().validate().unwrap();
+    fn requires_an_explicit_backend() {
+        let error = toml::from_str::<Config>("root_eligible = true").unwrap_err();
+        assert!(error.to_string().contains("missing field `backend`"));
     }
 
     #[test]
     fn rejects_unknown_fields() {
-        let error = toml::from_str::<Config>("unknown = true").unwrap_err();
+        let error = toml::from_str::<Config>("backend = 'test'\nunknown = true").unwrap_err();
         assert!(error.to_string().contains("unknown field"));
     }
 
     #[test]
-    fn validates_paths_and_timeouts() {
-        let config = Config {
-            backend: "relative".into(),
-            ..Config::default()
-        };
+    fn validates_backend_names_paths_and_timeouts() {
+        for backend in ["", "S6", "../s6", ".hidden", "s6/user"] {
+            let mut invalid = config();
+            invalid.backend = backend.into();
+            assert!(matches!(invalid.validate(), Err(ConfigError::Invalid(_))));
+        }
+
+        let mut invalid = config();
+        invalid.backend_config_dir = "relative".into();
         assert!(matches!(
-            config.validate(),
+            invalid.validate(),
             Err(ConfigError::RelativePath { .. })
         ));
 
-        let config = Config {
-            login_readiness_timeout_seconds: 0,
-            ..Config::default()
-        };
-        assert!(matches!(config.validate(), Err(ConfigError::Invalid(_))));
+        let mut invalid = config();
+        invalid.login_readiness_timeout_seconds = 0;
+        assert!(matches!(invalid.validate(), Err(ConfigError::Invalid(_))));
+    }
+
+    #[test]
+    fn resolves_backend_names_beneath_the_fixed_directory() {
+        let config = config();
+        assert_eq!(
+            config.backend_path(),
+            Path::new(BACKEND_DIRECTORY).join("test-backend")
+        );
     }
 
     #[test]
     fn backoff_is_bounded() {
-        let config = Config::default();
+        let config = config();
         assert_eq!(config.restart_delay(1), Duration::from_millis(500));
         assert_eq!(config.restart_delay(2), Duration::from_secs(1));
         assert_eq!(config.restart_delay(100), Duration::from_secs(30));
@@ -219,13 +265,9 @@ mod tests {
     fn loads_partial_config_with_defaults() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("config.toml");
-        fs::write(
-            &path,
-            "backend = '/opt/usersv/backend'\nroot_eligible = true\n",
-        )
-        .unwrap();
+        fs::write(&path, "backend = 's6-user'\nroot_eligible = true\n").unwrap();
         let config = Config::load(path).unwrap();
-        assert_eq!(config.backend, Path::new("/opt/usersv/backend"));
+        assert_eq!(config.backend, "s6-user");
         assert!(config.root_eligible);
         assert_eq!(config.graceful_stop_timeout_seconds, 15);
     }

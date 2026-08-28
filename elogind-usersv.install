@@ -1,0 +1,8 @@
+pre_remove() {
+    if [ -x /usr/bin/elogind-usersv-pam ]; then
+        /usr/bin/elogind-usersv-pam disable || {
+            echo 'elogind-usersv: refusing to leave a required PAM entry behind' >&2
+            return 1
+        }
+    fi
+}

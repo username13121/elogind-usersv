@@ -1,13 +1,12 @@
 #!/bin/sh
-# elogind-usersv backend for a per-user s6-svscan and s6-rc instance.
-# Existing s6 repository and shallow-readiness policy retained for this project.
+# elogind-usersv backend for the s6-user per-user service manager.
 
 case ${1-} in
     run)
         ;;
     ready)
-        [ "${2-}" = svscan-ready ] || {
-            echo "s6: invalid readiness token '${2-}'" >&2
+        [ "${2-}" = s6-user-ready ] || {
+            echo "s6-user backend: invalid readiness token '${2-}'" >&2
             exit 69
         }
         exit 0
@@ -33,38 +32,38 @@ ready_fifo=${2-}
 state=${3-}
 
 [ "${ELOGIND_USERSV_BACKEND_PROTOCOL-}" = 1 ] || {
-    echo "s6: unsupported elogind-usersv backend protocol" >&2
+    echo "s6-user backend: unsupported elogind-usersv backend protocol" >&2
     exit 69
 }
 [ -p "$ready_fifo" ] || {
-    echo "s6: invalid readiness FIFO '$ready_fifo'" >&2
+    echo "s6-user backend: invalid readiness FIFO '$ready_fifo'" >&2
     exit 69
 }
 [ -d "$state" ] || {
-    echo "s6: invalid state directory '$state'" >&2
+    echo "s6-user backend: invalid state directory '$state'" >&2
     exit 69
 }
 [ -n "${HOME-}" ] && [ -d "$HOME" ] || {
-    echo "s6: invalid HOME '${HOME-}'" >&2
+    echo "s6-user backend: invalid HOME '${HOME-}'" >&2
     exit 70
 }
 case ${XDG_RUNTIME_DIR-} in
     /*) ;;
     *)
-        echo "s6: XDG_RUNTIME_DIR is not an absolute verified path" >&2
+        echo "s6-user backend: XDG_RUNTIME_DIR is not an absolute verified path" >&2
         exit 70
         ;;
 esac
 [ -d "$XDG_RUNTIME_DIR" ] || {
-    echo "s6: XDG runtime directory does not exist: '$XDG_RUNTIME_DIR'" >&2
+    echo "s6-user backend: XDG runtime directory does not exist: '$XDG_RUNTIME_DIR'" >&2
     exit 70
 }
 
 set -eu
 
-# s6-user is the single authority for frontend paths. Do not reproduce its
-# filesystem policy or infer any path from the UID here.
-path_export=$(/usr/bin/s6-user version export)
+# s6-user is the single authority for persistent policy and resolved frontend
+# paths. Runtime paths come from s6 --user and the verified XDG_RUNTIME_DIR.
+path_export=$(/usr/bin/s6-user paths export)
 scandir=
 livedir=
 repodir=
@@ -83,7 +82,7 @@ require_absolute_path()
     case $1 in
         /*) ;;
         *)
-            echo "s6: unable to determine an absolute user $2" >&2
+            echo "s6-user backend: unable to determine an absolute user $2" >&2
             exit 70
             ;;
     esac
@@ -109,29 +108,54 @@ fi
 
 mkdir -p "$scandir"
 
-native_ready="$state/svscan-ready"
+native_ready="$state/s6-user-ready"
 rm -f "$native_ready"
 mkfifo "$native_ready"
+manager_pid=$$
 
 # Login readiness is deliberately shallow: release PAM as soon as s6-svscan
-# enters its event loop. The boot transaction continues asynchronously.
+# enters its event loop. The boot transaction continues asynchronously, but a
+# watchdog terminates it if the tracked s6-svscan process disappears.
 exec 4>"$ready_fifo"
 (
     if ! IFS= read -r _ <"$native_ready"; then
-        echo "s6: s6-svscan readiness FIFO closed without notification" >&2
+        echo "s6-user backend: s6-svscan readiness FIFO closed without notification" >&2
         exec 4>&-
         exit 70
     fi
 
-    printf 'svscan-ready\0' >&4
+    printf 's6-user-ready\0' >&4
     exec 4>&-
 
-    if ! /usr/bin/s6-user system boot; then
-        echo "s6: user service boot failed after manager readiness" >&2
-        exit 1
+    /usr/bin/s6-user system boot &
+    boot_pid=$!
+    watchdog_pid=
+    terminate_boot()
+    {
+        kill -TERM "$boot_pid" 2>/dev/null || :
+        [ -z "$watchdog_pid" ] || kill -TERM "$watchdog_pid" 2>/dev/null || :
+    }
+    trap 'terminate_boot; exit 70' HUP INT TERM
+    (
+        while kill -0 "$manager_pid" 2>/dev/null; do
+            sleep 1
+        done
+        kill -TERM "$boot_pid" 2>/dev/null || :
+    ) &
+    watchdog_pid=$!
+
+    boot_status=0
+    wait "$boot_pid" || boot_status=$?
+    kill -TERM "$watchdog_pid" 2>/dev/null || :
+    wait "$watchdog_pid" 2>/dev/null || :
+    trap - HUP INT TERM
+
+    if [ "$boot_status" -ne 0 ]; then
+        echo "s6-user backend: user service boot failed after manager readiness" >&2
+        exit "$boot_status"
     fi
 ) &
 exec 4>&-
 
-# The backend process must become the manager process tracked by the helper.
+# The backend process becomes the manager process tracked by the helper.
 exec /usr/bin/s6-svscan -d 3 "$scandir" 3>"$native_ready"

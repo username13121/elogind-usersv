@@ -176,7 +176,7 @@ dependencies = [
 
 [[package]]
 name = "elogind-usersv-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "elogind-usersv-protocol",
  "libc",
@@ -187,8 +187,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "elogind-usersv-pam-config"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "libc",
+]
+
+[[package]]
 name = "elogind-usersv-protocol"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libc",
  "tempfile",
@@ -197,7 +205,7 @@ dependencies = [
 
 [[package]]
 name = "elogind-usersv-supervisor"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "elogind-usersv-core",
@@ -208,7 +216,7 @@ dependencies = [
 
 [[package]]
 name = "elogind-usersvd"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "elogind-usersv-core",
@@ -522,7 +530,7 @@ dependencies = [
 
 [[package]]
 name = "pam-elogind-usersv"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "elogind-usersv-core",
  "elogind-usersv-protocol",

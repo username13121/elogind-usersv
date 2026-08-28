@@ -47,12 +47,12 @@ fn run() -> Result<()> {
         verify_root_owned_file(&arguments.config_path, false)
             .context("configuration file is not trusted")?;
     }
-    let config = Config::load_or_default(&arguments.config_path)?;
+    let config = Config::load(&arguments.config_path)?;
     runtime::prepare_runtime()?;
     let signals = SignalFd::install()?;
     let account = resolve_uid(arguments.uid)?;
     let _user_lock = UserLock::acquire(account.uid)?;
-    let backend = Backend::load(config.backend.clone(), config.backend_config_dir.clone())?;
+    let backend = Backend::load(config.backend_path(), config.backend_config_dir.clone())?;
 
     let lease = match PamLease::open(&account) {
         Ok(lease) => lease,

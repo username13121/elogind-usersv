@@ -1,8 +1,9 @@
 # elogind-usersv backend protocol version 1
 
 Backends are trusted, root-installed executable files. They may be binaries,
-scripts, or any other executable format supported by the kernel. The backend
-path is selected only by system configuration.
+scripts, or any other executable format supported by the kernel. System
+configuration must explicitly select a validated backend name; the executable
+is resolved beneath `/usr/libexec/elogind-usersv/backends`.
 
 Every action runs as the managed user, in that user's home directory (or `/`
 under the documented fallback policy), and receives the same sanitized

@@ -1,15 +1,16 @@
 pkgbase=elogind-usersv
-pkgname=('elogind-usersv' 'elogind-usersv-backend-s6' 'elogind-usersv-s6')
-pkgver=0.1.0
-pkgrel=3
+pkgname=('elogind-usersv' 'elogind-usersv-backend-s6-user' 'elogind-usersv-s6')
+pkgver=0.2.0
+pkgrel=1
 pkgdesc='Elogind-specific per-user service-manager launcher and lifecycle supervisor'
 arch=('x86_64')
 url='https://github.com/username13121/elogind-usersv'
 license=('GPL-3.0-only')
 makedepends=('cargo')
 options=('!debug')
-source=("$pkgbase-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+_source_mtime='2026-08-28T00:00:00Z'
+source=("$pkgbase-$pkgver.tar.gz::$url/releases/download/v$pkgver/$pkgbase-$pkgver.tar.gz")
+sha256sums=('c2140debcb817ff68cef6355db261cc56132701dea8a65a3de9d2304f2daef70')
 
 build() {
     cd "$pkgbase-$pkgver"
@@ -23,7 +24,8 @@ check() {
 
 package_elogind-usersv() {
     depends=('elogind' 'gcc-libs' 'glibc' 'pam')
-    optdepends=('elogind-usersv-backend-s6: per-user s6-svscan and s6-rc backend')
+    install=elogind-usersv.install
+    optdepends=('elogind-usersv-backend-s6-user: s6-user per-user service-manager backend')
     backup=('etc/elogind-usersv/config.toml'
             'etc/pam.d/elogind-usersv-manager')
 
@@ -34,6 +36,8 @@ package_elogind-usersv() {
         "$pkgdir/usr/libexec/elogind-usersv-supervisor"
     install -Dm755 target/release/libpam_elogind_usersv.so \
         "$pkgdir/usr/lib/security/pam_elogind_usersv.so"
+    install -Dm755 target/release/elogind-usersv-pam \
+        "$pkgdir/usr/bin/elogind-usersv-pam"
 
     install -Dm644 config/config.toml \
         "$pkgdir/etc/elogind-usersv/config.toml"
@@ -53,21 +57,25 @@ package_elogind-usersv() {
         "$pkgdir/usr/share/licenses/elogind-usersv/LICENSE"
 }
 
-package_elogind-usersv-backend-s6() {
-    pkgdesc='s6-svscan and s6-rc backend for elogind-usersv'
-    depends=('elogind-usersv' 's6-user')
+package_elogind-usersv-backend-s6-user() {
+    pkgdesc='s6-user per-user service-manager backend for elogind-usersv'
+    arch=('any')
+    depends=('elogind-usersv' 's6' 's6-user')
+    conflicts=('elogind-usersv-backend-s6')
+    replaces=('elogind-usersv-backend-s6')
 
     cd "$pkgbase-$pkgver"
-    install -Dm755 backends/s6 \
-        "$pkgdir/usr/libexec/elogind-usersv/backends/s6"
+    install -Dm755 backends/s6-user \
+        "$pkgdir/usr/libexec/elogind-usersv/backends/s6-user"
     install -Dm644 LICENSE \
-        "$pkgdir/usr/share/licenses/elogind-usersv-backend-s6/LICENSE"
+        "$pkgdir/usr/share/licenses/elogind-usersv-backend-s6-user/LICENSE"
 }
 
 package_elogind-usersv-s6() {
     pkgdesc='s6-rc system service definition for elogind-usersv'
+    arch=('any')
     groups=('s6-world')
-    depends=('elogind' 'elogind-usersv' 'elogind-usersv-backend-s6' 's6-base')
+    depends=('elogind-usersv' 's6-base')
     provides=('init-elogind-usersv')
     conflicts=('init-elogind-usersv')
 
