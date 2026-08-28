@@ -38,25 +38,16 @@ fi
 mkdir -p -- "$source_dir" "$build_dir" "$package_dir"
 rm -f -- "$package_dir"/elogind-usersv-*.pkg.tar.*
 
-# Supplying the release-shaped source archive locally keeps this build script
-# independent of any parent checkout and also allows packaging before upload.
-repository_root=$(git rev-parse --show-toplevel 2>/dev/null || true)
-if [[ $repository_root == "$project_root" ]]; then
-    git archive \
-        --format=tar.gz \
-        --prefix="$pkgbase-$pkgver/" \
-        --output="$source_archive" \
-        HEAD
-else
-    tar -C "$project_root" \
-        --exclude=.git \
-        --exclude=.build \
-        --exclude=.sources \
-        --exclude=packages \
-        --exclude=target \
-        --transform="s,^,$pkgbase-$pkgver/," \
-        -czf "$source_archive" .
-fi
+# Supply a release-shaped archive from the current working tree so local
+# source and PKGBUILD changes can be tested before they are committed.
+tar -C "$project_root" \
+    --exclude=.git \
+    --exclude=.build \
+    --exclude=.sources \
+    --exclude=packages \
+    --exclude=target \
+    --transform="s,^,$pkgbase-$pkgver/," \
+    -czf "$source_archive" .
 
 BUILDDIR="$build_dir" \
 SRCDEST="$source_dir" \

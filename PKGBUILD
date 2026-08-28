@@ -1,7 +1,7 @@
 pkgbase=elogind-usersv
 pkgname=('elogind-usersv' 'elogind-usersv-backend-s6' 'elogind-usersv-s6')
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 pkgdesc='Elogind-specific per-user service-manager launcher and lifecycle supervisor'
 arch=('x86_64')
 url='https://github.com/username13121/elogind-usersv'
@@ -29,7 +29,7 @@ package_elogind-usersv() {
 
     cd "$pkgbase-$pkgver"
     install -Dm755 target/release/elogind-usersvd \
-        "$pkgdir/usr/sbin/elogind-usersvd"
+        "$pkgdir/usr/bin/elogind-usersvd"
     install -Dm755 target/release/elogind-usersv-supervisor \
         "$pkgdir/usr/libexec/elogind-usersv-supervisor"
     install -Dm755 target/release/libpam_elogind_usersv.so \

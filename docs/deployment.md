@@ -40,7 +40,7 @@ sudo pacman -U packages/elogind-usersv-[0-9]*-x86_64.pkg.tar.zst \
 Important installed paths are:
 
 ```text
-/usr/sbin/elogind-usersvd
+/usr/bin/elogind-usersvd
 /usr/libexec/elogind-usersv-supervisor
 /usr/lib/security/pam_elogind_usersv.so
 /usr/libexec/elogind-usersv/backends/s6

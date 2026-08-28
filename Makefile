@@ -1,5 +1,5 @@
 PREFIX ?= /usr
-SBINDIR ?= $(PREFIX)/sbin
+BINDIR ?= $(PREFIX)/bin
 LIBEXECDIR ?= $(PREFIX)/libexec
 PAMDIR ?= $(PREFIX)/lib/security
 SYSCONFDIR ?= /etc
@@ -17,7 +17,7 @@ test:
 
 install: all
 	install -Dm755 target/release/elogind-usersvd \
-		$(DESTDIR)$(SBINDIR)/elogind-usersvd
+		$(DESTDIR)$(BINDIR)/elogind-usersvd
 	install -Dm755 target/release/elogind-usersv-supervisor \
 		$(DESTDIR)$(LIBEXECDIR)/elogind-usersv-supervisor
 	install -Dm755 target/release/libpam_elogind_usersv.so \

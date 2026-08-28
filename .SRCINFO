@@ -1,7 +1,7 @@
 pkgbase = elogind-usersv
 	pkgdesc = Elogind-specific per-user service-manager launcher and lifecycle supervisor
 	pkgver = 0.1.0
-	pkgrel = 1
+	pkgrel = 2
 	url = https://github.com/username13121/elogind-usersv
 	arch = x86_64
 	license = GPL-3.0-only
