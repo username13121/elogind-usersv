@@ -1,0 +1,4 @@
+# Add these lines to each participating login application's existing session
+# stack. Do not install this file as a complete PAM service.
+session required pam_elogind.so
+session required pam_elogind_usersv.so

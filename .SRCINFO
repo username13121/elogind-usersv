@@ -1,0 +1,35 @@
+pkgbase = elogind-usersv
+	pkgdesc = Elogind-specific per-user service-manager launcher and lifecycle supervisor
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/username13121/elogind-usersv
+	arch = x86_64
+	license = GPL-3.0-only
+	makedepends = cargo
+	options = !debug
+	source = elogind-usersv-0.1.0.tar.gz::https://github.com/username13121/elogind-usersv/archive/refs/tags/v0.1.0.tar.gz
+	sha256sums = SKIP
+
+pkgname = elogind-usersv
+	depends = elogind
+	depends = gcc-libs
+	depends = glibc
+	depends = pam
+	optdepends = elogind-usersv-backend-s6: per-user s6-svscan and s6-rc backend
+	backup = etc/elogind-usersv/config.toml
+	backup = etc/pam.d/elogind-usersv-manager
+
+pkgname = elogind-usersv-backend-s6
+	pkgdesc = s6-svscan and s6-rc backend for elogind-usersv
+	depends = elogind-usersv
+	depends = s6-user
+
+pkgname = elogind-usersv-s6
+	pkgdesc = s6-rc system service definition for elogind-usersv
+	groups = s6-world
+	depends = elogind
+	depends = elogind-usersv
+	depends = elogind-usersv-backend-s6
+	depends = s6-base
+	provides = init-elogind-usersv
+	conflicts = init-elogind-usersv

@@ -1,0 +1,137 @@
+#!/bin/sh
+# elogind-usersv backend for a per-user s6-svscan and s6-rc instance.
+# Existing s6 repository and shallow-readiness policy retained for this project.
+
+case ${1-} in
+    run)
+        ;;
+    ready)
+        [ "${2-}" = svscan-ready ] || {
+            echo "s6: invalid readiness token '${2-}'" >&2
+            exit 69
+        }
+        exit 0
+        ;;
+    stop)
+        pid=${2-}
+        case $pid in ''|*[!0-9]*) exit 69 ;; esac
+        [ "$pid" -gt 1 ] 2>/dev/null || exit 69
+
+        # A failed transition is harmless during migration or partial startup.
+        /usr/bin/s6-user live stop-everything -E -t 10000 \
+            >/dev/null 2>&1 || :
+
+        # SIGTERM requests s6-svscan's graceful supervision-tree shutdown.
+        exec kill -TERM "$pid"
+        ;;
+    *)
+        exit 32
+        ;;
+esac
+
+ready_fifo=${2-}
+state=${3-}
+
+[ "${ELOGIND_USERSV_BACKEND_PROTOCOL-}" = 1 ] || {
+    echo "s6: unsupported elogind-usersv backend protocol" >&2
+    exit 69
+}
+[ -p "$ready_fifo" ] || {
+    echo "s6: invalid readiness FIFO '$ready_fifo'" >&2
+    exit 69
+}
+[ -d "$state" ] || {
+    echo "s6: invalid state directory '$state'" >&2
+    exit 69
+}
+[ -n "${HOME-}" ] && [ -d "$HOME" ] || {
+    echo "s6: invalid HOME '${HOME-}'" >&2
+    exit 70
+}
+case ${XDG_RUNTIME_DIR-} in
+    /*) ;;
+    *)
+        echo "s6: XDG_RUNTIME_DIR is not an absolute verified path" >&2
+        exit 70
+        ;;
+esac
+[ -d "$XDG_RUNTIME_DIR" ] || {
+    echo "s6: XDG runtime directory does not exist: '$XDG_RUNTIME_DIR'" >&2
+    exit 70
+}
+
+set -eu
+
+# s6-user is the single authority for frontend paths. Do not reproduce its
+# filesystem policy or infer any path from the UID here.
+path_export=$(/usr/bin/s6-user version export)
+scandir=
+livedir=
+repodir=
+while IFS='=' read -r name value; do
+    case $name in
+        scandir) scandir=$value ;;
+        livedir) livedir=$value ;;
+        repodir) repodir=$value ;;
+    esac
+done <<EOF
+$path_export
+EOF
+
+require_absolute_path()
+{
+    case $1 in
+        /*) ;;
+        *)
+            echo "s6: unable to determine an absolute user $2" >&2
+            exit 70
+            ;;
+    esac
+}
+require_absolute_path "$scandir" scandir
+require_absolute_path "$livedir" livedir
+require_absolute_path "$repodir" repodir
+
+# Synchronization retains existing service prescriptions. Install boot state
+# only if no live state exists, so recovery never replaces a database under a
+# running s6-rc instance.
+if [ ! -e "$repodir" ]; then
+    /usr/bin/s6-user repository init
+else
+    /usr/bin/s6-user repository list >/dev/null
+    /usr/bin/s6-user repository sync
+fi
+
+if [ ! -e "$livedir" ] && [ ! -L "$livedir" ]; then
+    /usr/bin/s6-user set commit -f
+    /usr/bin/s6-user live install --init
+fi
+
+mkdir -p "$scandir"
+
+native_ready="$state/svscan-ready"
+rm -f "$native_ready"
+mkfifo "$native_ready"
+
+# Login readiness is deliberately shallow: release PAM as soon as s6-svscan
+# enters its event loop. The boot transaction continues asynchronously.
+exec 4>"$ready_fifo"
+(
+    if ! IFS= read -r _ <"$native_ready"; then
+        echo "s6: s6-svscan readiness FIFO closed without notification" >&2
+        exec 4>&-
+        exit 70
+    fi
+
+    printf 'svscan-ready\0' >&4
+    exec 4>&-
+
+    if ! /usr/bin/s6-user system boot; then
+        echo "s6: user service boot failed after manager readiness" >&2
+        exit 1
+    fi
+) &
+exec 4>&-
+
+# The backend process must become the manager process tracked by the helper.
+exec /usr/bin/s6-svscan -d 3 "$scandir" 3>"$native_ready"

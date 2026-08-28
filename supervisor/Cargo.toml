@@ -1,0 +1,13 @@
+[package]
+name = "elogind-usersv-supervisor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+elogind-usersv-core = { path = "../crates/core" }
+elogind-usersv-protocol = { path = "../crates/protocol" }
+libc.workspace = true
+log.workspace = true

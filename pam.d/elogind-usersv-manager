@@ -1,0 +1,2 @@
+# Internal lifetime lease. This profile MUST NOT include pam_elogind_usersv.
+session required pam_elogind.so class=background type=unspecified

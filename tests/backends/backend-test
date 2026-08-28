@@ -1,0 +1,81 @@
+#!/bin/sh
+# Deterministic backend-protocol-v1 implementation for conformance tests.
+
+set -eu
+
+operation=${1-}
+case $operation in
+    ready)
+        payload=${2-}
+        case $payload in
+            test-ready) exit 0 ;;
+            ready-fail) exit 1 ;;
+            *) exit 69 ;;
+        esac
+        ;;
+    stop)
+        pid=${2-}
+        case $pid in ''|*[!0-9]*) exit 69 ;; esac
+        kill -TERM "$pid"
+        exit 0
+        ;;
+    manager)
+        trap 'exit 0' TERM INT HUP
+        while :; do
+            sleep 1 &
+            wait "$!" || :
+        done
+        ;;
+    run)
+        ;;
+    *)
+        exit 32
+        ;;
+esac
+
+ready_fifo=${2-}
+state_dir=${3-}
+config_dir=${4-}
+[ -p "$ready_fifo" ] || exit 69
+[ -d "$state_dir" ] || exit 69
+[ -d "$config_dir" ] || exit 69
+[ "${ELOGIND_USERSV_BACKEND_PROTOCOL-}" = 1 ] || exit 69
+
+mode=success
+[ ! -r "$config_dir/mode" ] || IFS= read -r mode <"$config_dir/mode"
+case $mode in
+    success)
+        printf 'test-ready\000' >"$ready_fifo"
+        ;;
+    ready-fail)
+        printf 'ready-fail\000' >"$ready_fifo"
+        ;;
+    empty)
+        printf '\000' >"$ready_fifo"
+        exit 1
+        ;;
+    no-nul)
+        printf 'incomplete' >"$ready_fifo"
+        exit 1
+        ;;
+    multiple)
+        printf 'one\000two\000' >"$ready_fifo"
+        exit 1
+        ;;
+    oversized)
+        # 4097 payload bytes with no terminator.
+        awk 'BEGIN { for (i = 0; i < 4097; ++i) printf "x" }' >"$ready_fifo"
+        exit 1
+        ;;
+    manager-exit)
+        exit 1
+        ;;
+    timeout)
+        exec "$0" manager
+        ;;
+    *)
+        exit 69
+        ;;
+esac
+
+exec "$0" manager

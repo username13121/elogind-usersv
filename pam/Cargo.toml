@@ -1,0 +1,15 @@
+[package]
+name = "pam-elogind-usersv"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "pam_elogind_usersv"
+crate-type = ["cdylib"]
+
+[dependencies]
+elogind-usersv-core = { path = "../crates/core" }
+elogind-usersv-protocol = { path = "../crates/protocol" }
+libc.workspace = true

@@ -1,0 +1,6 @@
+/target/
+/.build/
+/.sources/
+/packages/
+*.pkg.tar.*
+*.pkg.tar.*.sig

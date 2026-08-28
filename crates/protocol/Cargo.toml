@@ -1,0 +1,13 @@
+[package]
+name = "elogind-usersv-protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+
+[dev-dependencies]
+libc.workspace = true
+tempfile = "3.24.0"
