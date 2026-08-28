@@ -1,5 +1,10 @@
 # elogind-usersv
 
+> [!WARNING]
+> **Work in progress.** Bugs and breaking changes are expected. This project
+> modifies the login path; test it on a disposable system with independent
+> recovery access before relying on it.
+
 `elogind-usersv` is an elogind-specific launcher and lifecycle supervisor for
 per-user service managers. It starts one selected backend for each user with
 an eligible elogind login session and retains a separately verified elogind
