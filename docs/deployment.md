@@ -61,7 +61,9 @@ session required pam_elogind.so class=background type=unspecified
 ```
 
 The helper also sets `XDG_SESSION_CLASS=background` and
-`XDG_SESSION_TYPE=unspecified` before opening the transaction. Startup fails
+`XDG_SESSION_TYPE=unspecified` before opening the transaction. This is a
+session-only PAM application: it initializes supplementary groups itself and
+does not dispatch an authentication stack with `pam_setcred`. Startup fails
 unless login1 confirms the expected UID, exact class, service, and runtime
 path. Never change this class to `manager`: manager classes do not pin the
 elogind user.

@@ -1,7 +1,7 @@
 pkgbase=elogind-usersv
 pkgname=('elogind-usersv' 'elogind-usersv-backend-s6' 'elogind-usersv-s6')
 pkgver=0.1.0
-pkgrel=2
+pkgrel=3
 pkgdesc='Elogind-specific per-user service-manager launcher and lifecycle supervisor'
 arch=('x86_64')
 url='https://github.com/username13121/elogind-usersv'

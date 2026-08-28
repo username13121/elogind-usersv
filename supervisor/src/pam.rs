@@ -8,9 +8,6 @@ use anyhow::{Context, Result, bail};
 use elogind_usersv_core::{account::Account, config::INTERNAL_PAM_SERVICE};
 
 const PAM_SUCCESS: c_int = 0;
-const PAM_SILENT: c_int = 0x8000;
-const PAM_ESTABLISH_CRED: c_int = 0x0002;
-const PAM_DELETE_CRED: c_int = 0x0004;
 const PAM_CONV_ERR: c_int = 19;
 
 type PamHandle = c_void;
@@ -52,7 +49,6 @@ unsafe extern "C" {
     fn pam_putenv(pamh: *mut PamHandle, name_value: *const c_char) -> c_int;
     fn pam_getenv(pamh: *mut PamHandle, name: *const c_char) -> *const c_char;
     fn pam_getenvlist(pamh: *mut PamHandle) -> *mut *mut c_char;
-    fn pam_setcred(pamh: *mut PamHandle, flags: c_int) -> c_int;
     fn pam_open_session(pamh: *mut PamHandle, flags: c_int) -> c_int;
     fn pam_close_session(pamh: *mut PamHandle, flags: c_int) -> c_int;
     fn pam_strerror(pamh: *mut PamHandle, status: c_int) -> *const c_char;
@@ -94,12 +90,10 @@ impl PamLease {
         if unsafe { libc::initgroups(user.as_ptr(), account.gid) } != 0 {
             bail!("initgroups failed: {}", std::io::Error::last_os_error());
         }
-        // SAFETY: handle remains owned by lease.
-        check(
-            lease.handle,
-            unsafe { pam_setcred(lease.handle, PAM_ESTABLISH_CRED) },
-            "pam_setcred(PAM_ESTABLISH_CRED)",
-        )?;
+        // This dedicated profile has only a session stack. Calling
+        // pam_setcred would dispatch the system's fallback auth stack; on
+        // Linux-PAM, the usual pam_deny fallback returns PAM_CRED_ERR.
+        // Supplementary groups were established explicitly above.
         // SAFETY: handle remains owned by lease.
         check(
             lease.handle,
@@ -181,15 +175,6 @@ impl PamLease {
                 first_error = Some(pam_error(self.handle, status, "pam_close_session"));
             }
             self.opened = false;
-        }
-        // SAFETY: handle is valid until pam_end.
-        let status = unsafe { pam_setcred(self.handle, PAM_DELETE_CRED | PAM_SILENT) };
-        if status != PAM_SUCCESS && first_error.is_none() {
-            first_error = Some(pam_error(
-                self.handle,
-                status,
-                "pam_setcred(PAM_DELETE_CRED)",
-            ));
         }
         // SAFETY: this consumes the PAM transaction.
         let status = unsafe {
