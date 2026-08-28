@@ -73,6 +73,6 @@ cp -- "$source_archive" "$package_dir/"
 
 (
     cd "$package_dir"
-    sha256sum -- *.pkg.tar.zst "$pkgbase-$pkgver.tar.gz" >SHA256SUMS
+    sha256sum -- *.pkg.tar.zst >SHA256SUMS
 )
 echo "==> Release artifacts and SHA256SUMS are in $package_dir"

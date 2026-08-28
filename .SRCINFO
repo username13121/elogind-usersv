@@ -8,7 +8,7 @@ pkgbase = elogind-usersv
 	makedepends = cargo
 	options = !debug
 	source = elogind-usersv-0.2.0.tar.gz::https://github.com/username13121/elogind-usersv/releases/download/v0.2.0/elogind-usersv-0.2.0.tar.gz
-	sha256sums = c2140debcb817ff68cef6355db261cc56132701dea8a65a3de9d2304f2daef70
+	sha256sums = 552e8fb76eb32d797702eadbfc89df1819ac0cb6c07997d955d6904ee1b81e5a
 
 pkgname = elogind-usersv
 	install = elogind-usersv.install

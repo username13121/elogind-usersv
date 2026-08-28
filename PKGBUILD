@@ -10,7 +10,7 @@ makedepends=('cargo')
 options=('!debug')
 _source_mtime='2026-08-28T00:00:00Z'
 source=("$pkgbase-$pkgver.tar.gz::$url/releases/download/v$pkgver/$pkgbase-$pkgver.tar.gz")
-sha256sums=('c2140debcb817ff68cef6355db261cc56132701dea8a65a3de9d2304f2daef70')
+sha256sums=('552e8fb76eb32d797702eadbfc89df1819ac0cb6c07997d955d6904ee1b81e5a')
 
 build() {
     cd "$pkgbase-$pkgver"

@@ -31,8 +31,9 @@ not claim to be an official s6 per-user implementation.
 
 ## Install without compiling
 
-Download the unsigned `.pkg.tar.zst` files and `SHA256SUMS` from the official
-GitHub Release page after installing the s6-user project packages:
+After installing the s6-user project packages, download the unsigned
+`.pkg.tar.zst` files and `SHA256SUMS` from the official
+[GitHub Releases page](https://github.com/username13121/elogind-usersv/releases/latest):
 
 ```sh
 sha256sum -c SHA256SUMS
@@ -45,6 +46,8 @@ Install Cargo and the normal package build tools first. The script builds only;
 it never invokes pacman or resolves dependencies.
 
 ```sh
+git clone https://github.com/username13121/elogind-usersv.git
+cd elogind-usersv
 ./build.sh --clean && sudo pacman -U ./packages/*.pkg.tar.zst
 ```
 
